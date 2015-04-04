@@ -8,14 +8,18 @@ Let's [find out](http://viewer.gorilla-repl.org/view.html?source=github&user=bry
 
 If you want to try for yourself:
 ```
-$ lein gorilla
+$ lein gorilla :port 9000
 Gorilla-REPL: 0.3.4
-Started nREPL server on port 64510
-Running at http://127.0.0.1:64512/worksheet.html .
+Started nREPL server on port 64756
+Running at http://127.0.0.1:9000/worksheet.html .
 Ctrl+C to exit.
+Loading: monopoly.cljw ... done.
 ```
 
-Open your browser to the specified port, and hack away!
+Open your browser to:
+http://127.0.0.1:9000/worksheet.html?filename=monopoly.cljw
+
+And start your hacking!
 
 ## License
 
