@@ -6,10 +6,7 @@ In a recent game, my friend introduced some house rules - monopoly lottery. The 
 
 Let's [find out](http://viewer.gorilla-repl.org/view.html?source=github&user=brycecovert&repo=monopoly-lottery&path=monopoly.cljw). You can either [view the solution here](http://viewer.gorilla-repl.org/view.html?source=github&user=brycecovert&repo=monopoly-lottery&path=monopoly.cljw), thanks to gorilla repl, or clone and try yourself.
 
-See here:
-http://viewer.gorilla-repl.org/view.html?source=github&user=brycecovert&repo=monopoly-lottery&path=monopoly.cljw
-
-Example:
+If you want to try for yourself:
 ```
 $ lein gorilla
 Gorilla-REPL: 0.3.4
