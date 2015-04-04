@@ -1,0 +1,290 @@
+;; gorilla-repl.fileformat = 1
+
+;; **
+;;; # Monopoly Lottery
+;;; 
+;;; At a recent monopoly night, a friend suggested some new "house rules". 
+;;; 
+;;; When you pass go, you can buy a lottery ticket for $50. If you land on the free parking, your lottery ticket wins, and adds $500 to your bag. I'm not a gambling man, but I suspected that I could figure whether the odds were in my favor or not.
+;;; 
+;;; This is a great problem to solve, because it's easy to simulate (as we'll see), and it's completely independent of the other players.
+;;; 
+;;; Enter clojure. Let's figure out if we can game the system.
+;;; 
+;; **
+
+;; @@
+(ns monpoly-test)
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-nil'>nil</span>","value":"nil"}
+;; <=
+
+;; **
+;;; Let's start by making a function to roll two dice:
+;; **
+
+;; @@
+
+(defn dice-roll
+  "Rolls the dice, returning the tuple of rolls"
+  []
+  (take 2 (repeatedly #(inc (rand-int 6)))))
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;monpoly-test/dice-roll</span>","value":"#'monpoly-test/dice-roll"}
+;; <=
+
+;; **
+;;; The Monopoly board has 40 squares. We're going to track which square we're on as we go around the board. After we pass go, we'll still keep incrementing our square. We'll take the remainder after diving by 40 to find out our board square.
+;;; 
+;; **
+
+;; @@
+(defn times-around [square]
+  (int (/ square 40)))
+
+
+(println "If I'm on square 234, I've passed go" (times-around 234) "times.")
+
+
+(defn board-square [square]
+  (mod square 40))
+
+(println "If I'm on square 234, I'm on the board square" (board-square 234))
+
+
+
+;; @@
+;; ->
+;;; If I&#x27;m on square 234, I&#x27;ve passed go 5 times.
+;;; If I&#x27;m on square 234, I&#x27;m on the board square 34
+;;; 
+;; <-
+;; =>
+;;; {"type":"html","content":"<span class='clj-nil'>nil</span>","value":"nil"}
+;; <=
+
+;; **
+;;; 
+;; **
+
+;; **
+;;; Let's create a function that moves us around the board. 
+;;; 
+;;; For the purposes of movement, we need to keep track of two things: our current square, and the number of consecutive doubles we've rolled. 
+;; **
+
+;; @@
+(defn move [square]
+  (apply + square (dice-roll)))
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;monpoly-test/move</span>","value":"#'monpoly-test/move"}
+;; <=
+
+;; **
+;;; Now, let's play the game. We'll go around the board a fixed number of times, and calculate the likelyhood of landing on free parking on a particular round.
+;; **
+
+;; @@
+(def free-parking-square 20)
+
+(defn play-game [times-around]
+  (loop [square 0 free-parkings 0]
+    (let [new-square (move square)
+          free-parkings (if (= free-parking-square (board-square square)) 
+                          (inc free-parkings) 
+                          free-parkings)]
+      (if (>= (/ new-square 40)
+             times-around)
+        (double (/ free-parkings times-around))
+        (recur new-square free-parkings)))))
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;monpoly-test/play-game</span>","value":"#'monpoly-test/play-game"}
+;; <=
+
+;; **
+;;; ### The moment of truth. 
+;;; What are the chances that I'll land on free parking?
+;; **
+
+;; @@
+(play-game 30000)
+
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-double'>0.1466</span>","value":"0.1466"}
+;; <=
+
+;; **
+;;; ### Well, not really - what about jail?
+;;; 
+;;; Our chances are actually much better than that. In real life, jail sucks. Especially going to jail for accidentally running into a man with a whistle. But in our monopoly world, jail-time greatly improves our chances. 
+;;; 
+;;; Let's update our solution to send us to jail.
+;;; 
+;;; Let's start by calculating the jail square based on where we are right now.
+;; **
+
+;; @@
+(def jail-square 10)
+
+(defn go-to-jail [square]
+  (+ (* (times-around square) 40)
+     jail-square))
+
+(println "If I went to jail while on square 48, I'd have to go to square" (go-to-jail 48))
+;; @@
+;; ->
+;;; If I went to jail while on square 48, I&#x27;d have to go to square 50
+;;; 
+;; <-
+;; =>
+;;; {"type":"html","content":"<span class='clj-nil'>nil</span>","value":"nil"}
+;; <=
+
+;; **
+;;; Next, we've got to make our move function send us to jail if we're speeding, or we land on the "go to jail" square. We will also update our game to track how many doubles we've hit.
+;; **
+
+;; @@
+(def go-to-jail-square 30)
+
+(defn move [square doubles]
+  (let [[d1 d2] (dice-roll)
+        doubles? (= d1 d2)
+        speeding? (and (= doubles 2) doubles?)
+        new-square (+ square d1 d2)]
+    (if (or speeding?
+            (= go-to-jail-square new-square))
+      [(go-to-jail square) 0]
+      [new-square (if doubles? (inc doubles) doubles)])))
+
+(defn play-game [times-around]
+  (loop [square 0 doubles 0 free-parkings 0]
+    (let [[new-square new-doubles] (move square doubles)
+          free-parkings (if (= 20 (mod new-square 40)) (inc free-parkings) free-parkings)]
+      (if (>= (/ new-square 40)
+             times-around)
+        (double (/ free-parkings times-around))
+        (recur new-square new-doubles free-parkings)))))
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;monpoly-test/play-game</span>","value":"#'monpoly-test/play-game"}
+;; <=
+
+;; **
+;;; The **real** moment of truth.
+;; **
+
+;; @@
+(play-game 30000)
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-double'>0.1730333333333333</span>","value":"0.1730333333333333"}
+;; <=
+
+;; **
+;;; ### But what about the money?
+;;; 
+;;; Okay, in our simulation, we hit the lottery 17%ish percent of the time. So what? Is it worth it?
+;;; 
+;;; Monopoly isn't about probability. It's about greed. Let's calculate the net impact in terms of benjamins that taking this bet would yield.
+;;; 
+;;; We'll start by creating some functions to buy and collect lottery tickets. 
+;; **
+
+;; @@
+(defn buy-lottery-ticket [cash old-square new-square]
+  (if (passed-go? old-square new-square)                                    
+    (- cash 50)
+    cash))
+
+(defn collect-lottery [cash square]
+  (if (= free-parking (board-square square))
+    (+ cash 500)
+    cash))
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;monpoly-test/collect-lottery</span>","value":"#'monpoly-test/collect-lottery"}
+;; <=
+
+;; **
+;;; And we'll also update our play-game function to track cash instead of probabilities.
+;; **
+
+;; @@
+(defn play-game [times-around]
+  (loop [square 0 doubles 0 cash 0]
+    (let [[new-square new-doubles] (move square doubles)]
+      (if (>= (/ new-square 40)
+             times-around)
+        cash
+        (recur new-square new-doubles 
+              (-> cash
+              (buy-lottery-ticket square new-square)
+              (collect-lottery new-square)))))))
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;monpoly-test/play-game</span>","value":"#'monpoly-test/play-game"}
+;; <=
+
+;; **
+;;; So if we one random game, going around the board 25 times, buying a lottery ticket each time, how much money do we make or lose?
+;; **
+
+;; @@
+(play-game 25)
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-long'>1300</span>","value":"1300"}
+;; <=
+
+;; **
+;;; Not bad! We're up $1,300! But this is only one game. We could easily play a game where we never hit free parking, right? Let's play 5,000 games.
+;; **
+
+;; @@
+(require '[gorilla-plot.core :as plot])
+(plot/histogram (take 5000 (repeatedly #(play-game 25))) :bins 50)
+;; @@
+;; =>
+;;; {"type":"vega","content":{"axes":[{"scale":"x","type":"x"},{"scale":"y","type":"y"}],"scales":[{"name":"x","type":"linear","range":"width","zero":false,"domain":{"data":"b04c2ebb-acbf-4b3c-ad7a-ba5f6db85e9a","field":"data.x"}},{"name":"y","type":"linear","range":"height","nice":true,"zero":false,"domain":{"data":"b04c2ebb-acbf-4b3c-ad7a-ba5f6db85e9a","field":"data.y"}}],"marks":[{"type":"line","from":{"data":"b04c2ebb-acbf-4b3c-ad7a-ba5f6db85e9a"},"properties":{"enter":{"x":{"scale":"x","field":"data.x"},"y":{"scale":"y","field":"data.y"},"interpolate":{"value":"step-before"},"fill":{"value":"steelblue"},"fillOpacity":{"value":0.4},"stroke":{"value":"steelblue"},"strokeWidth":{"value":2},"strokeOpacity":{"value":1}}}}],"data":[{"name":"b04c2ebb-acbf-4b3c-ad7a-ba5f6db85e9a","values":[{"x":-1200.0,"y":0},{"x":-1070.0,"y":48.0},{"x":-940.0,"y":0.0},{"x":-810.0,"y":0.0},{"x":-680.0,"y":240.0},{"x":-550.0,"y":0.0},{"x":-420.0,"y":0.0},{"x":-290.0,"y":0.0},{"x":-159.99999999999997,"y":583.0},{"x":-29.999999999999943,"y":0.0},{"x":100.00000000000009,"y":0.0},{"x":230.0000000000001,"y":0.0},{"x":360.0000000000001,"y":892.0},{"x":490.0000000000001,"y":0.0},{"x":620.0000000000001,"y":0.0},{"x":750.0000000000001,"y":0.0},{"x":880.0000000000001,"y":1047.0},{"x":1010.0000000000001,"y":0.0},{"x":1140.0000000000002,"y":0.0},{"x":1270.0000000000002,"y":0.0},{"x":1400.0000000000002,"y":869.0},{"x":1530.0000000000002,"y":0.0},{"x":1660.0000000000002,"y":0.0},{"x":1790.0000000000002,"y":0.0},{"x":1920.0000000000002,"y":646.0},{"x":2050.0000000000005,"y":0.0},{"x":2180.0000000000005,"y":0.0},{"x":2310.0000000000005,"y":355.0},{"x":2440.0000000000005,"y":0.0},{"x":2570.0000000000005,"y":0.0},{"x":2700.0000000000005,"y":0.0},{"x":2830.0000000000005,"y":169.0},{"x":2960.0000000000005,"y":0.0},{"x":3090.0000000000005,"y":0.0},{"x":3220.0000000000005,"y":0.0},{"x":3350.0000000000005,"y":87.0},{"x":3480.0000000000005,"y":0.0},{"x":3610.0000000000005,"y":0.0},{"x":3740.0000000000005,"y":0.0},{"x":3870.0000000000005,"y":47.0},{"x":4000.0000000000005,"y":0.0},{"x":4130.000000000001,"y":0.0},{"x":4260.000000000001,"y":0.0},{"x":4390.000000000001,"y":14.0},{"x":4520.000000000001,"y":0.0},{"x":4650.000000000001,"y":0.0},{"x":4780.000000000001,"y":0.0},{"x":4910.000000000001,"y":2.0},{"x":5040.000000000001,"y":0.0},{"x":5170.000000000001,"y":0.0},{"x":5300.000000000001,"y":1.0},{"x":5430.000000000001,"y":0}]}],"width":400,"height":247.2187957763672,"padding":{"bottom":20,"top":10,"right":10,"left":50}},"value":"#gorilla_repl.vega.VegaView{:content {:axes [{:scale \"x\", :type \"x\"} {:scale \"y\", :type \"y\"}], :scales [{:name \"x\", :type \"linear\", :range \"width\", :zero false, :domain {:data \"b04c2ebb-acbf-4b3c-ad7a-ba5f6db85e9a\", :field \"data.x\"}} {:name \"y\", :type \"linear\", :range \"height\", :nice true, :zero false, :domain {:data \"b04c2ebb-acbf-4b3c-ad7a-ba5f6db85e9a\", :field \"data.y\"}}], :marks [{:type \"line\", :from {:data \"b04c2ebb-acbf-4b3c-ad7a-ba5f6db85e9a\"}, :properties {:enter {:x {:scale \"x\", :field \"data.x\"}, :y {:scale \"y\", :field \"data.y\"}, :interpolate {:value \"step-before\"}, :fill {:value \"steelblue\"}, :fillOpacity {:value 0.4}, :stroke {:value \"steelblue\"}, :strokeWidth {:value 2}, :strokeOpacity {:value 1}}}}], :data [{:name \"b04c2ebb-acbf-4b3c-ad7a-ba5f6db85e9a\", :values ({:x -1200.0, :y 0} {:x -1070.0, :y 48.0} {:x -940.0, :y 0.0} {:x -810.0, :y 0.0} {:x -680.0, :y 240.0} {:x -550.0, :y 0.0} {:x -420.0, :y 0.0} {:x -290.0, :y 0.0} {:x -159.99999999999997, :y 583.0} {:x -29.999999999999943, :y 0.0} {:x 100.00000000000009, :y 0.0} {:x 230.0000000000001, :y 0.0} {:x 360.0000000000001, :y 892.0} {:x 490.0000000000001, :y 0.0} {:x 620.0000000000001, :y 0.0} {:x 750.0000000000001, :y 0.0} {:x 880.0000000000001, :y 1047.0} {:x 1010.0000000000001, :y 0.0} {:x 1140.0000000000002, :y 0.0} {:x 1270.0000000000002, :y 0.0} {:x 1400.0000000000002, :y 869.0} {:x 1530.0000000000002, :y 0.0} {:x 1660.0000000000002, :y 0.0} {:x 1790.0000000000002, :y 0.0} {:x 1920.0000000000002, :y 646.0} {:x 2050.0000000000005, :y 0.0} {:x 2180.0000000000005, :y 0.0} {:x 2310.0000000000005, :y 355.0} {:x 2440.0000000000005, :y 0.0} {:x 2570.0000000000005, :y 0.0} {:x 2700.0000000000005, :y 0.0} {:x 2830.0000000000005, :y 169.0} {:x 2960.0000000000005, :y 0.0} {:x 3090.0000000000005, :y 0.0} {:x 3220.0000000000005, :y 0.0} {:x 3350.0000000000005, :y 87.0} {:x 3480.0000000000005, :y 0.0} {:x 3610.0000000000005, :y 0.0} {:x 3740.0000000000005, :y 0.0} {:x 3870.0000000000005, :y 47.0} {:x 4000.0000000000005, :y 0.0} {:x 4130.000000000001, :y 0.0} {:x 4260.000000000001, :y 0.0} {:x 4390.000000000001, :y 14.0} {:x 4520.000000000001, :y 0.0} {:x 4650.000000000001, :y 0.0} {:x 4780.000000000001, :y 0.0} {:x 4910.000000000001, :y 2.0} {:x 5040.000000000001, :y 0.0} {:x 5170.000000000001, :y 0.0} {:x 5300.000000000001, :y 1.0} {:x 5430.000000000001, :y 0})}], :width 400, :height 247.2188, :padding {:bottom 20, :top 10, :right 10, :left 50}}}"}
+;; <=
+
+;; **
+;;; A pretty compelling story, if you ask me. This picture tells us that 4/5 games, we're in the green by buying a lottery ticket each go around. 
+;;; 
+;;; This all assumes that you go around the board 25 times. The more times you go around the board, the more your favorable odds present themselves. For example:
+;; **
+
+;; **
+;;; 
+;; **
+
+;; **
+;;; 
+;; **
+
+;; @@
+(require '[gorilla-plot.core :as plot])
+(plot/histogram (take 5000 (repeatedly #(play-game 200))) :bins 50)
+;; @@
+;; =>
+;;; {"type":"vega","content":{"axes":[{"scale":"x","type":"x"},{"scale":"y","type":"y"}],"scales":[{"name":"x","type":"linear","range":"width","zero":false,"domain":{"data":"4847e4ce-b0a3-4c00-9250-ca19e33d6eaa","field":"data.x"}},{"name":"y","type":"linear","range":"height","nice":true,"zero":false,"domain":{"data":"4847e4ce-b0a3-4c00-9250-ca19e33d6eaa","field":"data.y"}}],"marks":[{"type":"line","from":{"data":"4847e4ce-b0a3-4c00-9250-ca19e33d6eaa"},"properties":{"enter":{"x":{"scale":"x","field":"data.x"},"y":{"scale":"y","field":"data.y"},"interpolate":{"value":"step-before"},"fill":{"value":"steelblue"},"fillOpacity":{"value":0.4},"stroke":{"value":"steelblue"},"strokeWidth":{"value":2},"strokeOpacity":{"value":1}}}}],"data":[{"name":"4847e4ce-b0a3-4c00-9250-ca19e33d6eaa","values":[{"x":-1450.0,"y":0},{"x":-1050.0,"y":2.0},{"x":-650.0,"y":3.0},{"x":-249.99999999999994,"y":3.0},{"x":150.0000000000001,"y":9.0},{"x":550.0000000000002,"y":12.0},{"x":950.0000000000002,"y":0.0},{"x":1350.0000000000002,"y":16.0},{"x":1750.0000000000002,"y":36.0},{"x":2150.0000000000005,"y":63.0},{"x":2550.0000000000005,"y":79.0},{"x":2950.0000000000005,"y":0.0},{"x":3350.0000000000005,"y":112.0},{"x":3750.0000000000005,"y":122.0},{"x":4150.000000000001,"y":165.0},{"x":4550.000000000001,"y":220.0},{"x":4950.000000000001,"y":0.0},{"x":5350.000000000001,"y":266.0},{"x":5750.000000000001,"y":303.0},{"x":6150.000000000001,"y":330.0},{"x":6550.000000000001,"y":353.0},{"x":6950.000000000001,"y":0.0},{"x":7350.000000000001,"y":344.0},{"x":7750.000000000001,"y":348.0},{"x":8150.000000000001,"y":340.0},{"x":8550.000000000002,"y":338.0},{"x":8950.000000000002,"y":0.0},{"x":9350.000000000002,"y":278.0},{"x":9750.000000000002,"y":279.0},{"x":10150.000000000002,"y":227.0},{"x":10550.000000000002,"y":176.0},{"x":10950.000000000002,"y":0.0},{"x":11350.000000000002,"y":156.0},{"x":11750.000000000002,"y":124.0},{"x":12150.000000000002,"y":83.0},{"x":12550.000000000002,"y":70.0},{"x":12950.000000000002,"y":0.0},{"x":13350.000000000002,"y":47.0},{"x":13750.000000000002,"y":36.0},{"x":14150.000000000002,"y":21.0},{"x":14550.000000000002,"y":22.0},{"x":14950.000000000002,"y":0.0},{"x":15350.000000000002,"y":8.0},{"x":15750.000000000002,"y":2.0},{"x":16150.000000000002,"y":2.0},{"x":16550.000000000004,"y":2.0},{"x":16950.000000000004,"y":0.0},{"x":17350.000000000004,"y":1.0},{"x":17750.000000000004,"y":0.0},{"x":18150.000000000004,"y":1.0},{"x":18550.000000000004,"y":1.0},{"x":18950.000000000004,"y":0}]}],"width":400,"height":247.2187957763672,"padding":{"bottom":20,"top":10,"right":10,"left":50}},"value":"#gorilla_repl.vega.VegaView{:content {:axes [{:scale \"x\", :type \"x\"} {:scale \"y\", :type \"y\"}], :scales [{:name \"x\", :type \"linear\", :range \"width\", :zero false, :domain {:data \"4847e4ce-b0a3-4c00-9250-ca19e33d6eaa\", :field \"data.x\"}} {:name \"y\", :type \"linear\", :range \"height\", :nice true, :zero false, :domain {:data \"4847e4ce-b0a3-4c00-9250-ca19e33d6eaa\", :field \"data.y\"}}], :marks [{:type \"line\", :from {:data \"4847e4ce-b0a3-4c00-9250-ca19e33d6eaa\"}, :properties {:enter {:x {:scale \"x\", :field \"data.x\"}, :y {:scale \"y\", :field \"data.y\"}, :interpolate {:value \"step-before\"}, :fill {:value \"steelblue\"}, :fillOpacity {:value 0.4}, :stroke {:value \"steelblue\"}, :strokeWidth {:value 2}, :strokeOpacity {:value 1}}}}], :data [{:name \"4847e4ce-b0a3-4c00-9250-ca19e33d6eaa\", :values ({:x -1450.0, :y 0} {:x -1050.0, :y 2.0} {:x -650.0, :y 3.0} {:x -249.99999999999994, :y 3.0} {:x 150.0000000000001, :y 9.0} {:x 550.0000000000002, :y 12.0} {:x 950.0000000000002, :y 0.0} {:x 1350.0000000000002, :y 16.0} {:x 1750.0000000000002, :y 36.0} {:x 2150.0000000000005, :y 63.0} {:x 2550.0000000000005, :y 79.0} {:x 2950.0000000000005, :y 0.0} {:x 3350.0000000000005, :y 112.0} {:x 3750.0000000000005, :y 122.0} {:x 4150.000000000001, :y 165.0} {:x 4550.000000000001, :y 220.0} {:x 4950.000000000001, :y 0.0} {:x 5350.000000000001, :y 266.0} {:x 5750.000000000001, :y 303.0} {:x 6150.000000000001, :y 330.0} {:x 6550.000000000001, :y 353.0} {:x 6950.000000000001, :y 0.0} {:x 7350.000000000001, :y 344.0} {:x 7750.000000000001, :y 348.0} {:x 8150.000000000001, :y 340.0} {:x 8550.000000000002, :y 338.0} {:x 8950.000000000002, :y 0.0} {:x 9350.000000000002, :y 278.0} {:x 9750.000000000002, :y 279.0} {:x 10150.000000000002, :y 227.0} {:x 10550.000000000002, :y 176.0} {:x 10950.000000000002, :y 0.0} {:x 11350.000000000002, :y 156.0} {:x 11750.000000000002, :y 124.0} {:x 12150.000000000002, :y 83.0} {:x 12550.000000000002, :y 70.0} {:x 12950.000000000002, :y 0.0} {:x 13350.000000000002, :y 47.0} {:x 13750.000000000002, :y 36.0} {:x 14150.000000000002, :y 21.0} {:x 14550.000000000002, :y 22.0} {:x 14950.000000000002, :y 0.0} {:x 15350.000000000002, :y 8.0} {:x 15750.000000000002, :y 2.0} {:x 16150.000000000002, :y 2.0} {:x 16550.000000000004, :y 2.0} {:x 16950.000000000004, :y 0.0} {:x 17350.000000000004, :y 1.0} {:x 17750.000000000004, :y 0.0} {:x 18150.000000000004, :y 1.0} {:x 18550.000000000004, :y 1.0} {:x 18950.000000000004, :y 0})}], :width 400, :height 247.2188, :padding {:bottom 20, :top 10, :right 10, :left 50}}}"}
+;; <=
+
+;; **
+;;; # Conclusion
+;;; 
+;;; So is it worth it to buy the lottery ticket? I think so.
+;;; 
+;;; This simulation does not model the opportunity cost by buying into the lottery. Also, computers can not feel pain. What happens when you've gone around the board 10 times without a single free parking? Will you still want to fork out the cash for another lottery ticket?
+;;; 
+;;; Only you can decide.
+;;; 
+;;; 
+;;; *If you're astute, you may have noticed that I didn't include the possibility of going directly to go via a chance or community chest card. Feel free to send me a PR with that!*
+;; **
